@@ -1,0 +1,24 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Environments
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# VS Code / IDEs
+.vscode/
+.idea/
+
+# Large Datasets
+HAM10000_images_part_1/
+HAM10000_images_part_2/
+HAM10000_metadata.csv
+dataset/
