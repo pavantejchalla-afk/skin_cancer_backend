@@ -32,6 +32,13 @@ async def lifespan(app: FastAPI):
 
     logger.info("Starting Skin Cancer backend")
 
+    try:
+        from app.database.db import init_db
+        init_db()
+        logger.info("SQLite Database initialized successfully")
+    except Exception as e:
+        logger.warning("Database init info: %s", e)
+
     app.state.inference = SkinCancerInference(
         model_path=settings.model_path,
         device=settings.device
