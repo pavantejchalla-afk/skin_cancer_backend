@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -13,10 +14,10 @@ class Settings(BaseSettings):
 
     app_name: str = "skin-cancer-backend"
     host: str = "0.0.0.0"
-    port: int = 5000
+    port: int = int(os.environ.get("PORT", "5000"))
     model_path: str = "models/best_model.pth"
     device: str = "cpu"
-    allowed_origins: list[str] = ["http://localhost:3003", "http://localhost:3004"]
+    allowed_origins: list[str] = ["*"]
     max_image_bytes: int = 5_000_000
     rate_limit: str = "120/minute"
 
