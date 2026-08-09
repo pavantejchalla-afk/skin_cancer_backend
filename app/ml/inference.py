@@ -3,7 +3,10 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 
+import gc
 import torch
+torch.set_num_threads(1)
+
 from PIL import Image
 from torchvision import models
 from torchvision.transforms import Compose, Normalize, Resize, ToTensor
@@ -38,13 +41,14 @@ class SkinCancerInference:
         model = self.build_model()
 
         if self.model_path and self.model_path.exists():
-            state = torch.load(self.model_path, map_location=self.device)
+            state = torch.load(self.model_path, map_location="cpu")
             if isinstance(state, dict) and "model_state_dict" in state:
                 model.load_state_dict(state["model_state_dict"])
-                logger.info("Loaded model weights from %s", self.model_path)
             else:
                 model.load_state_dict(state)
-                logger.info("Loaded model state dict from %s", self.model_path)
+            del state
+            gc.collect()
+            logger.info("Loaded model weights from %s", self.model_path)
         else:
             logger.warning("Model checkpoint not found at %s. Using ImageNet-pretrained MobileNetV2 with randomly initialized classification head.", self.model_path)
 
