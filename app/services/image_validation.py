@@ -1,44 +1,15 @@
 from __future__ import annotations
 
-from functools import lru_cache
 from io import BytesIO
-from pathlib import Path
-
 import numpy as np
 from PIL import Image
 
-ERROR_MESSAGE = "Please upload a clear skin lesion image"
-ARCHIVE_ROOT = Path(__file__).resolve().parents[2].parent / "archive"
-REFERENCE_LIMIT = 40
+ERROR_MESSAGE = "Invalid Image: Strictly only skin lesion images are allowed. Please upload a clear photo of a skin lesion."
 IMAGE_SIZE = (224, 224)
 
-
-@lru_cache(maxsize=1)
-def load_reference_stats() -> tuple[np.ndarray, np.ndarray] | None:
-    image_paths = []
-    for folder in (ARCHIVE_ROOT / "HAM10000_images_part_1", ARCHIVE_ROOT / "HAM10000_images_part_2"):
-        if folder.exists():
-            image_paths.extend(sorted(folder.glob("*.jpg")))
-
-    if not image_paths:
-        return None
-
-    samples = image_paths[:REFERENCE_LIMIT]
-    features = []
-
-    for path in samples:
-        try:
-            with Image.open(path) as image:
-                image = image.convert("RGB").resize(IMAGE_SIZE)
-                features.append(compute_feature_vector(image))
-        except Exception:
-            continue
-
-    if not features:
-        return None
-
-    stacked = np.stack(features)
-    return stacked.mean(axis=0), stacked.std(axis=0)
+# Pre-computed HAM10000 dataset reference statistics
+REF_MEAN = np.array([0.027710566, 0.02103821, 0.11911831, 0.6291344], dtype=np.float32)
+REF_STD = np.array([0.012806608, 0.007206459, 0.22829008, 0.07139179], dtype=np.float32)
 
 
 def compute_feature_vector(image: Image.Image) -> np.ndarray:
@@ -60,22 +31,25 @@ def validate_image_bytes(image_bytes: bytes) -> None:
     try:
         with Image.open(BytesIO(image_bytes)) as image:
             image = image.convert("RGB")
-            if image.size[0] < 128 or image.size[1] < 128:
+            if image.size[0] < 100 or image.size[1] < 100:
                 raise ValueError(ERROR_MESSAGE)
 
-            image = image.resize(IMAGE_SIZE)
-            features = compute_feature_vector(image)
+            resized = image.resize(IMAGE_SIZE)
+            features = compute_feature_vector(resized)
     except Exception as exc:
         raise ValueError(ERROR_MESSAGE) from exc
 
-    stats = load_reference_stats()
-    if stats is None:
-        if float(features[0]) < 0.0015 and float(features[1]) < 0.012 and float(features[3]) < 0.22:
-            raise ValueError(ERROR_MESSAGE)
-        return
+    variance, edge_density, skin_ratio, luma = features[0], features[1], features[2], features[3]
 
-    mean, std = stats
-    z_score = np.abs((features - mean) / np.maximum(std, 1e-6))
+    # 1. Reject solid colors / dark / overexposed images
+    if variance < 0.002 or luma < 0.10 or luma > 0.95:
+        raise ValueError(ERROR_MESSAGE)
 
-    if float(z_score.sum()) > 15.0:
+    # 2. Reject text documents / random noise
+    if edge_density > 0.10:
+        raise ValueError(ERROR_MESSAGE)
+
+    # 3. Reject non-skin objects with high Z-score deviation from HAM10000 dataset
+    z_score = float(np.abs((features - REF_MEAN) / np.maximum(REF_STD, 1e-6)).sum())
+    if z_score > 10.0:
         raise ValueError(ERROR_MESSAGE)
