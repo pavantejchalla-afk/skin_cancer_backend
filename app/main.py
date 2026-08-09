@@ -33,9 +33,10 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Skin Cancer backend")
 
     try:
+        import threading
         from app.database.db import init_db
-        init_db()
-        logger.info("SQLite Database initialized successfully")
+        threading.Thread(target=init_db, daemon=True).start()
+        logger.info("Database background init started")
     except Exception as e:
         logger.warning("Database init info: %s", e)
 
