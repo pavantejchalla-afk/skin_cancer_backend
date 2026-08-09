@@ -30,7 +30,7 @@ class SkinCancerInference:
         )
 
     def build_model(self) -> torch.nn.Module:
-        model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.IMAGENET1K_V1)
+        model = models.mobilenet_v2(weights=None)
         model.classifier[1] = torch.nn.Linear(in_features=model.classifier[1].in_features, out_features=len(self.classes))
         return model
 
