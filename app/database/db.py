@@ -16,18 +16,20 @@ def is_postgres():
 
 def get_db_connection():
     if is_postgres():
-        import psycopg2
-        import psycopg2.extras
-        url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-        # Add sslmode=require if not present for Railway/cloud PostgreSQL
-        if "sslmode" not in url.lower():
-            url += "?sslmode=require" if "?" not in url else "&sslmode=require"
-        conn = psycopg2.connect(url, cursor_factory=psycopg2.extras.DictCursor, connect_timeout=5)
-        return conn
-    else:
-        conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            import psycopg2
+            import psycopg2.extras
+            url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+            if "sslmode" not in url.lower() and "railway.internal" not in url:
+                url += "?sslmode=require" if "?" not in url else "&sslmode=require"
+            conn = psycopg2.connect(url, cursor_factory=psycopg2.extras.DictCursor, connect_timeout=3)
+            return conn
+        except Exception as e:
+            logger.warning("PostgreSQL connection failed (%s), falling back to SQLite database.", e)
+
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 def init_db():
@@ -35,7 +37,8 @@ def init_db():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        if is_postgres():
+        # Check if we are using PostgreSQL or SQLite connection
+        if is_postgres() and hasattr(cursor, 'execute_values'):
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS dataset_metadata (
                     id SERIAL PRIMARY KEY,
